@@ -1,5 +1,5 @@
 import { eachDayOfInterval, isWeekend, getDay, format } from 'date-fns';
-import db from './db';
+import sql from './db';
 
 type ShiftType = 'weekday' | 'weekend_pri' | 'weekend_sec';
 
@@ -17,7 +17,7 @@ interface UserStats {
     datesAssigned: Set<string>;
 }
 
-export function generateSchedule() {
+export async function generateSchedule(teamName: string) {
     const startDate = new Date(2026, 0, 3); // Jan 3, 2026
     const endDate = new Date(2026, 4, 10); // May 10, 2026
 
@@ -47,9 +47,26 @@ export function generateSchedule() {
         }
     });
 
-    // 2. Fetch users and preferences
-    const users = db.prepare('SELECT id, handicap FROM users').all() as { id: number, handicap: number }[];
-    const preferences = db.prepare('SELECT user_id, date, status FROM preferences').all() as { user_id: number, date: string, status: number }[];
+    // 2. Fetch users and preferences for this team
+    // We assume users belong to the team.
+    const usersResult = await sql`SELECT id, handicap FROM users WHERE team_name = ${teamName}`;
+    const users = usersResult.rows as { id: number, handicap: number }[];
+
+    if (users.length === 0) {
+        console.warn(`No users found for team: ${teamName}`);
+        return;
+    }
+
+    // Fetch preferences for these users
+    // We can join or just fetch all for these user IDs.
+    // Let's fetch all preferences for users in this team.
+    const preferencesResult = await sql`
+        SELECT p.user_id, p.date, p.status 
+        FROM preferences p
+        JOIN users u ON p.user_id = u.id
+        WHERE u.team_name = ${teamName}
+    `;
+    const preferences = preferencesResult.rows as { user_id: number, date: string, status: number }[];
 
     // Map preferences for quick lookup: userId -> date -> status
     const prefMap = new Map<number, Map<string, number>>();
@@ -73,7 +90,13 @@ export function generateSchedule() {
     });
 
     // Load LOCKED shifts into stats
-    const lockedShifts = db.prepare('SELECT date, type, user_id FROM schedule WHERE locked = 1').all() as { date: string, type: ShiftType, user_id: number }[];
+    // Only for this team
+    const lockedShiftsResult = await sql`
+        SELECT date, type, user_id 
+        FROM schedule 
+        WHERE locked = 1 AND team_name = ${teamName}
+    `;
+    const lockedShifts = lockedShiftsResult.rows as { date: string, type: ShiftType, user_id: number }[];
     const lockedKeys = new Set<string>();
 
     lockedShifts.forEach(ls => {
@@ -88,10 +111,6 @@ export function generateSchedule() {
     });
 
     // 4. Assignment Logic
-    // We'll process Weekend Primary first (hardest), then Weekend Secondary, then Weekday.
-    // Or maybe shuffle shifts to avoid bias?
-    // Let's sort shifts: WeekendPri, WeekendSec, Weekday.
-
     const sortedShifts = [...shifts].sort((a, b) => {
         const typeScore = (t: ShiftType) => {
             if (t === 'weekend_pri') return 0;
@@ -102,13 +121,8 @@ export function generateSchedule() {
     });
 
     // Clear existing schedule BUT keep locked ones
-    db.prepare('DELETE FROM schedule WHERE locked = 0').run();
-
-    // We need to be careful not to insert duplicates for locked shifts.
-    // The UNIQUE constraint will fail if we try to insert.
-    // So we should filter out shifts that are already locked.
-
-    const insertStmt = db.prepare('INSERT INTO schedule (date, type, user_id) VALUES (?, ?, ?)');
+    // Only for this team
+    await sql`DELETE FROM schedule WHERE locked = 0 AND team_name = ${teamName}`;
 
     for (const shift of sortedShifts) {
         // Skip if this slot is locked
@@ -140,12 +154,6 @@ export function generateSchedule() {
             const stats = userStats.get(u.id)!;
             let score = 0;
 
-            // Balance counts
-            // Handicap: Positive handicap means they should take MORE shifts, so we LOWER their score.
-            // Negative handicap means LESS shifts, so we RAISE their score.
-            // We subtract the handicap from the count-based score.
-            // Since score is roughly count * 10, we can subtract handicap * 10.
-
             const handicap = (u as any).handicap || 0;
             const totalCount = stats.weekdayCount + stats.weekendPriCount + stats.weekendSecCount;
 
@@ -153,11 +161,6 @@ export function generateSchedule() {
             if (shift.type === 'weekend_pri') score += stats.weekendPriCount * 10;
             if (shift.type === 'weekend_sec') score += stats.weekendSecCount * 10;
 
-            // Apply handicap to TOTAL score to bias overall assignment
-            // We use a smaller multiplier (e.g., 1 or 2) so it acts as a tie-breaker 
-            // and doesn't override the primary goal of balancing specific shift types.
-            // If handicap is 1, score reduces by 2.
-            // This means if two users have equal specific counts, the one with handicap will win.
             score += (totalCount - handicap) * 2;
 
             // Preference penalty
@@ -166,7 +169,6 @@ export function generateSchedule() {
             if (status === 2) score += 500; // Strongly Prefer Not
 
             // Avoid back-to-back (yesterday or tomorrow)
-            // Simple check: if assigned yesterday, add penalty
             const yesterday = new Date(shift.date);
             yesterday.setDate(yesterday.getDate() - 1);
             const yStr = format(yesterday, 'yyyy-MM-dd');
@@ -183,12 +185,14 @@ export function generateSchedule() {
         // Sort by score
         scoredCandidates.sort((a, b) => a.score - b.score);
 
-        // Pick best (or random among ties to distribute better?)
-        // Let's pick the best.
+        // Pick best
         const best = scoredCandidates[0].user;
 
         // Assign
-        insertStmt.run(shift.date, shift.type, best.id);
+        await sql`
+            INSERT INTO schedule (date, type, user_id, team_name) 
+            VALUES (${shift.date}, ${shift.type}, ${best.id}, ${teamName})
+        `;
 
         // Update stats
         const stats = userStats.get(best.id)!;

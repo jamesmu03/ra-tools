@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import db from '@/lib/db';
+import sql from '@/lib/db';
 
 export async function completeOnboarding(formData: FormData) {
     const isRc = formData.get('is_rc') === 'on';
@@ -16,9 +16,9 @@ export async function completeOnboarding(formData: FormData) {
     }
 
     if (isRc) {
-        db.prepare('UPDATE users SET role = ?, team_name = ?, onboarding_completed = 1 WHERE netid = ?').run('admin', teamName, netid);
+        await sql`UPDATE users SET role = 'admin', team_name = ${teamName}, onboarding_completed = 1 WHERE netid = ${netid}`;
     } else {
-        db.prepare('UPDATE users SET onboarding_completed = 1 WHERE netid = ?').run(netid);
+        await sql`UPDATE users SET onboarding_completed = 1 WHERE netid = ${netid}`;
     }
 
     redirect('/');

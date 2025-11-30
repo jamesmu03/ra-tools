@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import db from '@/lib/db';
+import sql from '@/lib/db';
 
 export async function login(formData: FormData) {
     const netid = formData.get('netid') as string;
@@ -13,16 +13,18 @@ export async function login(formData: FormData) {
     }
 
     // Check if user exists, if not create
-    const user = db.prepare('SELECT * FROM users WHERE netid = ?').get(netid) as any;
+    const userResult = await sql`SELECT * FROM users WHERE netid = ${netid}`;
+    const user = userResult.rows[0];
 
     if (!user) {
-        const userCount = db.prepare('SELECT count(*) as count FROM users').get() as { count: number };
-        const role = userCount.count === 0 ? 'admin' : 'user';
+        const countResult = await sql`SELECT count(*) as count FROM users`;
+        const userCount = parseInt(countResult.rows[0].count);
+        const role = userCount === 0 ? 'admin' : 'user';
 
-        db.prepare('INSERT INTO users (netid, name, role) VALUES (?, ?, ?)').run(netid, name, role);
+        await sql`INSERT INTO users (netid, name, role) VALUES (${netid}, ${name}, ${role})`;
     } else {
         // Update name if changed
-        db.prepare('UPDATE users SET name = ? WHERE netid = ?').run(name, netid);
+        await sql`UPDATE users SET name = ${name} WHERE netid = ${netid}`;
     }
 
     // Set cookie

@@ -1,47 +1,96 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { sql } from '@vercel/postgres';
 
-const dbPath = path.join(process.cwd(), 'ra-scheduler.db');
-const db = new Database(dbPath);
+// Helper to initialize the database schema
+// This should be called once, e.g., via a script or a special API route
+export async function initSchema() {
+  try {
+    // Users Table
+    await sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        netid TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT,
+        handicap INTEGER DEFAULT 0,
+        role TEXT DEFAULT 'user',
+        team_name TEXT,
+        onboarding_completed INTEGER DEFAULT 0
+      );
+    `;
 
-// Initialize database schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    netid TEXT UNIQUE NOT NULL,
-    name TEXT NOT NULL,
-    email TEXT, -- Added for Phase 2
-    handicap INTEGER DEFAULT 0, -- Added for Phase 4
-    role TEXT DEFAULT 'user', -- 'admin' or 'user'
-    team_name TEXT, -- Added for Phase 21
-    onboarding_completed INTEGER DEFAULT 0 -- Added for Phase 23
-  );
+    // Preferences Table
+    await sql`
+      CREATE TABLE IF NOT EXISTS preferences (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        date TEXT NOT NULL,
+        status INTEGER NOT NULL,
+        UNIQUE(user_id, date)
+      );
+    `;
 
-  CREATE TABLE IF NOT EXISTS preferences (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    date TEXT NOT NULL, -- YYYY-MM-DD
-    status INTEGER NOT NULL, -- 0: Available, 1: Prefer Not, 2: Strongly Prefer Not, 3: Excused
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    UNIQUE(user_id, date)
-  );
+    // Schedule Table
+    await sql`
+      CREATE TABLE IF NOT EXISTS schedule (
+        id SERIAL PRIMARY KEY,
+        date TEXT NOT NULL,
+        type TEXT NOT NULL,
+        user_id INTEGER REFERENCES users(id),
+        locked INTEGER DEFAULT 0,
+        UNIQUE(date, type, user_id) -- Modified unique constraint to allow multiple teams potentially, but for now keeping simple
+      );
+    `;
+    // Note: The original UNIQUE(date, type) assumes only one schedule per day. 
+    // For multi-tenancy, we need to filter by user's team, so the constraint should probably include team or we just rely on app logic.
+    // Actually, if we want multiple quads, 'date' and 'type' are not unique globally anymore.
+    // They are unique PER QUAD.
+    // Since we don't have a 'quads' table yet, we rely on 'user_id' to infer quad.
+    // But 'schedule' entries might not have a user_id if we have open slots? 
+    // The current logic inserts assigned slots.
+    // If we want to enforce uniqueness per quad, we need a way to know the quad of the schedule slot.
+    // We should add 'team_name' to the schedule table to make it explicit and queryable without joining.
 
-  CREATE TABLE IF NOT EXISTS schedule (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT NOT NULL, -- YYYY-MM-DD
-    type TEXT NOT NULL, -- 'weekday', 'weekend_pri', 'weekend_sec'
-    user_id INTEGER,
-    locked INTEGER DEFAULT 0, -- Added for Phase 5: 0=false, 1=true
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    UNIQUE(date, type)
-  );
+    // Let's add team_name to schedule and events for easier multi-tenancy.
 
-  CREATE TABLE IF NOT EXISTS events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT UNIQUE NOT NULL, -- YYYY-MM-DD
-    name TEXT NOT NULL
-  );
-`);
+    // We need to alter the table if it exists, or just create it with the new column.
+    // Since we are migrating to a fresh DB, we can define it correctly now.
 
-export default db;
+    await sql`
+      CREATE TABLE IF NOT EXISTS schedule (
+        id SERIAL PRIMARY KEY,
+        date TEXT NOT NULL,
+        type TEXT NOT NULL,
+        user_id INTEGER REFERENCES users(id),
+        locked INTEGER DEFAULT 0,
+        team_name TEXT NOT NULL -- Added for multi-tenancy
+      );
+    `;
+    // We should probably remove the unique constraint or make it (date, type, team_name).
+    // Let's make it (date, type, team_name).
+    await sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_unique ON schedule (date, type, team_name);
+    `;
+
+
+    // Events Table
+    await sql`
+      CREATE TABLE IF NOT EXISTS events (
+        id SERIAL PRIMARY KEY,
+        date TEXT NOT NULL,
+        name TEXT NOT NULL,
+        team_name TEXT NOT NULL -- Added for multi-tenancy
+      );
+    `;
+    // Unique date per team
+    await sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_events_unique ON events (date, team_name);
+    `;
+
+    console.log('Schema initialized successfully');
+  } catch (error) {
+    console.error('Error initializing schema:', error);
+    throw error;
+  }
+}
+
+export default sql;

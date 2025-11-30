@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import db from '@/lib/db';
+import sql from '@/lib/db';
 
 export async function GET(request: NextRequest) {
     // Duke/Shibboleth Headers
@@ -34,16 +34,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user exists, if not create
-    const user = db.prepare('SELECT * FROM users WHERE netid = ?').get(netid) as any;
+    const userResult = await sql`SELECT * FROM users WHERE netid = ${netid}`;
+    const user = userResult.rows[0];
 
     if (!user) {
-        const userCount = db.prepare('SELECT count(*) as count FROM users').get() as { count: number };
-        const role = userCount.count === 0 ? 'admin' : 'user';
-        db.prepare('INSERT INTO users (netid, name, email, role) VALUES (?, ?, ?, ?)').run(netid, name, email, role);
+        const countResult = await sql`SELECT count(*) as count FROM users`;
+        const userCount = parseInt(countResult.rows[0].count);
+        const role = userCount === 0 ? 'admin' : 'user';
+
+        // We don't set team_name here, it will be set during onboarding
+        await sql`INSERT INTO users (netid, name, email, role) VALUES (${netid}, ${name}, ${email}, ${role})`;
     } else {
         // Update name/email if changed
         if (user.name !== name || user.email !== email) {
-            db.prepare('UPDATE users SET name = ?, email = ? WHERE netid = ?').run(name, email, netid);
+            await sql`UPDATE users SET name = ${name}, email = ${email} WHERE netid = ${netid}`;
         }
     }
 

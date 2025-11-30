@@ -1,7 +1,7 @@
 'use server'
 
 import { cookies } from 'next/headers';
-import db from '@/lib/db';
+import sql from '@/lib/db';
 import { eachDayOfInterval, getDay } from 'date-fns';
 
 export async function getPreferences() {
@@ -10,10 +10,12 @@ export async function getPreferences() {
 
     if (!netid) return {};
 
-    const user = db.prepare('SELECT id FROM users WHERE netid = ?').get(netid) as any;
+    const userResult = await sql`SELECT id FROM users WHERE netid = ${netid}`;
+    const user = userResult.rows[0];
     if (!user) return {};
 
-    const prefs = db.prepare('SELECT date, status FROM preferences WHERE user_id = ?').all(user.id) as any[];
+    const prefsResult = await sql`SELECT date, status FROM preferences WHERE user_id = ${user.id}`;
+    const prefs = prefsResult.rows;
 
     const prefMap: Record<string, number> = {};
     prefs.forEach(p => {
@@ -24,7 +26,11 @@ export async function getPreferences() {
 }
 
 export async function getEvents() {
-    return db.prepare('SELECT date, name FROM events').all() as { date: string, name: string }[];
+    // Events should be filtered by team.
+    // We need to get the current user's team first.
+    const teamName = await getTeamName();
+    const eventsResult = await sql`SELECT date, name FROM events WHERE team_name = ${teamName}`;
+    return eventsResult.rows as { date: string, name: string }[];
 }
 
 export async function savePreference(date: string, status: number) {
@@ -33,19 +39,20 @@ export async function savePreference(date: string, status: number) {
 
     if (!netid) throw new Error('Not authenticated');
 
-    const user = db.prepare('SELECT id FROM users WHERE netid = ?').get(netid) as any;
+    const userResult = await sql`SELECT id FROM users WHERE netid = ${netid}`;
+    const user = userResult.rows[0];
     if (!user) throw new Error('User not found');
 
     if (status === 0) {
         // Remove preference if "Available" (default)
-        db.prepare('DELETE FROM preferences WHERE user_id = ? AND date = ?').run(user.id, date);
+        await sql`DELETE FROM preferences WHERE user_id = ${user.id} AND date = ${date}`;
     } else {
         // Upsert preference
-        db.prepare(`
-        INSERT INTO preferences (user_id, date, status) 
-        VALUES (?, ?, ?)
-        ON CONFLICT(user_id, date) DO UPDATE SET status = excluded.status
-      `).run(user.id, date, status);
+        await sql`
+            INSERT INTO preferences (user_id, date, status) 
+            VALUES (${user.id}, ${date}, ${status})
+            ON CONFLICT(user_id, date) DO UPDATE SET status = excluded.status
+        `;
     }
 }
 
@@ -55,10 +62,11 @@ export async function resetPreferences() {
 
     if (!netid) throw new Error('Not authenticated');
 
-    const user = db.prepare('SELECT id FROM users WHERE netid = ?').get(netid) as any;
+    const userResult = await sql`SELECT id FROM users WHERE netid = ${netid}`;
+    const user = userResult.rows[0];
     if (!user) throw new Error('User not found');
 
-    db.prepare('DELETE FROM preferences WHERE user_id = ?').run(user.id);
+    await sql`DELETE FROM preferences WHERE user_id = ${user.id}`;
 }
 
 export async function getShiftStats() {
@@ -83,46 +91,47 @@ export async function getShiftStats() {
         }
     });
 
-    const userCount = (db.prepare('SELECT count(*) as count FROM users').get() as { count: number }).count;
+    // Get current user to determine team
+    const currentUser = await getCurrentUser();
+    const teamName = currentUser?.team_name || 'RA Scheduler';
+
+    // Count users in THIS team
+    const userCountResult = await sql`SELECT count(*) as count FROM users WHERE team_name = ${teamName}`;
+    const userCount = parseInt(userCountResult.rows[0].count);
 
     // Calculate availability for current user
-    const cookieStore = await cookies();
-    const netid = cookieStore.get('netid')?.value;
     let myAvailableWeekday = 0;
     let myAvailableWeekend = 0;
 
-    if (netid) {
-        const user = db.prepare('SELECT id FROM users WHERE netid = ?').get(netid) as any;
-        if (user) {
-            const prefs = db.prepare('SELECT date, status FROM preferences WHERE user_id = ?').all(user.id) as any[];
-            const blockedDates = new Set(prefs.filter(p => p.status === 2 || p.status === 3).map(p => p.date)); // Strongly Prefer Not (2) or Excused (3) count as blocked? Or just Excused?
-            // User asked for "highest number of days that everyone can block out".
-            // Let's count "Available" days (Status 0 or 1).
-            // Actually, let's count days that are NOT "Excused" (3) or "Strongly Prefer Not" (2).
-            // Or maybe just count Explicitly Available?
-            // Let's count days where status is NOT 3 (Excused).
-            let availableWeekday = 0;
-            let availableWeekend = 0;
+    if (currentUser) {
+        const prefsResult = await sql`SELECT date, status FROM preferences WHERE user_id = ${currentUser.id}`;
+        const prefs = prefsResult.rows;
 
-            allDays.forEach(day => {
-                if (day >= sbStart && day <= sbEnd) return;
-                const dateStr = day.toISOString().split('T')[0];
-                const status = prefs.find(p => p.date === dateStr)?.status || 0;
+        // Count days that are NOT "Excused" (3) or "Strongly Prefer Not" (2)?
+        // The logic in original code was:
+        // status === 0 (Available) -> count it.
 
-                // Only count as available if status is 0 (Available)
-                if (status === 0) {
-                    const dayOfWeek = getDay(day);
-                    if (dayOfWeek === 5 || dayOfWeek === 6) {
-                        availableWeekend++;
-                    } else {
-                        availableWeekday++;
-                    }
+        let availableWeekday = 0;
+        let availableWeekend = 0;
+
+        allDays.forEach(day => {
+            if (day >= sbStart && day <= sbEnd) return;
+            const dateStr = day.toISOString().split('T')[0];
+            const status = prefs.find(p => p.date === dateStr)?.status || 0;
+
+            // Only count as available if status is 0 (Available)
+            if (status === 0) {
+                const dayOfWeek = getDay(day);
+                if (dayOfWeek === 5 || dayOfWeek === 6) {
+                    availableWeekend++;
+                } else {
+                    availableWeekday++;
                 }
-            });
+            }
+        });
 
-            myAvailableWeekday = availableWeekday;
-            myAvailableWeekend = availableWeekend;
-        }
+        myAvailableWeekday = availableWeekday;
+        myAvailableWeekend = availableWeekend;
     }
 
     const totalSlots = weekdaySlots + weekendSlots;
@@ -151,7 +160,8 @@ export async function getCurrentUser() {
     const cookieStore = await cookies();
     const netid = cookieStore.get('netid')?.value;
     if (!netid) return null;
-    return db.prepare('SELECT * FROM users WHERE netid = ?').get(netid) as any;
+    const result = await sql`SELECT * FROM users WHERE netid = ${netid}`;
+    return result.rows[0];
 }
 
 export async function getTeamName() {
@@ -159,14 +169,17 @@ export async function getTeamName() {
     const netid = cookieStore.get('netid')?.value;
     if (!netid) return 'RA Scheduler';
 
-    const user = db.prepare('SELECT role, team_name FROM users WHERE netid = ?').get(netid) as any;
+    const userResult = await sql`SELECT role, team_name FROM users WHERE netid = ${netid}`;
+    const user = userResult.rows[0];
     if (!user) return 'RA Scheduler';
 
     if (user.team_name) return user.team_name;
 
-    // If user has no team_name, try to find an admin's team name
-    const admin = db.prepare("SELECT team_name FROM users WHERE role = 'admin' AND team_name IS NOT NULL LIMIT 1").get() as any;
-    return admin?.team_name || 'RA Scheduler';
+    // If user has no team_name, try to find an admin's team name?
+    // In multi-tenant, falling back to *any* admin is dangerous.
+    // Better to return a default or null.
+    // For now, let's return 'RA Scheduler' if no team is set.
+    return 'RA Scheduler';
 }
 
 export async function bulkApplyPreference(dayOfWeek: number, status: number) {
@@ -175,7 +188,8 @@ export async function bulkApplyPreference(dayOfWeek: number, status: number) {
 
     if (!netid) throw new Error('Not authenticated');
 
-    const user = db.prepare('SELECT id FROM users WHERE netid = ?').get(netid) as any;
+    const userResult = await sql`SELECT id FROM users WHERE netid = ${netid}`;
+    const user = userResult.rows[0];
     if (!user) throw new Error('User not found');
 
     const startDate = new Date(2026, 0, 3); // Jan 3, 2026
@@ -194,23 +208,19 @@ export async function bulkApplyPreference(dayOfWeek: number, status: number) {
         }
     });
 
-    const insertStmt = db.prepare(`
-        INSERT INTO preferences (user_id, date, status) 
-        VALUES (?, ?, ?)
-        ON CONFLICT(user_id, date) DO UPDATE SET status = excluded.status
-    `);
+    // Vercel Postgres doesn't support transactions in the same way as better-sqlite3
+    // We can just loop and await, or construct a big query.
+    // Looping is safer for now.
 
-    const deleteStmt = db.prepare('DELETE FROM preferences WHERE user_id = ? AND date = ?');
-
-    const transaction = db.transaction((days: string[]) => {
-        for (const date of days) {
-            if (status === 0) {
-                deleteStmt.run(user.id, date);
-            } else {
-                insertStmt.run(user.id, date, status);
-            }
+    for (const date of daysToUpdate) {
+        if (status === 0) {
+            await sql`DELETE FROM preferences WHERE user_id = ${user.id} AND date = ${date}`;
+        } else {
+            await sql`
+                INSERT INTO preferences (user_id, date, status) 
+                VALUES (${user.id}, ${date}, ${status})
+                ON CONFLICT(user_id, date) DO UPDATE SET status = excluded.status
+            `;
         }
-    });
-
-    transaction(daysToUpdate);
+    }
 }
