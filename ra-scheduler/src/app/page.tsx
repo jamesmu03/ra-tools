@@ -1,11 +1,14 @@
-import { getPreferences, getCurrentUser } from './actions';
-import Calendar from '@/components/Calendar';
+import { getPreferences, getCurrentUser, getEvents, getShiftStats } from './actions';
+import DashboardClient from '@/components/DashboardClient';
 import { logout } from './login/actions';
 import Link from 'next/link';
+import clsx from 'clsx';
 
 export default async function Dashboard() {
   const preferences = await getPreferences();
   const user = await getCurrentUser();
+  const events = await getEvents();
+  const stats = await getShiftStats();
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -29,17 +32,12 @@ export default async function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-8">
-          <p className="text-sm text-blue-700">
-            <strong>Instructions:</strong> Click on dates to toggle your preference.
-            <br />
-            Click once for <span className="bg-yellow-200 px-1">Prefer Not</span> (Yellow),
-            twice for <span className="bg-red-200 px-1">Cannot</span> (Red),
-            and again to clear (Available).
-          </p>
-        </div>
-
-        <Calendar initialPreferences={preferences} />
+        <DashboardClient
+          initialPreferences={preferences}
+          events={events}
+          stats={stats}
+          user={user}
+        />
       </div>
     </div>
   );

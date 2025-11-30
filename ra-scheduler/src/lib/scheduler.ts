@@ -18,8 +18,8 @@ interface UserStats {
 }
 
 export function generateSchedule() {
-    const startDate = new Date(2025, 0, 3); // Jan 3
-    const endDate = new Date(2025, 4, 10); // May 10
+    const startDate = new Date(2026, 0, 3); // Jan 3, 2026
+    const endDate = new Date(2026, 4, 10); // May 10, 2026
 
     const allDays = eachDayOfInterval({ start: startDate, end: endDate });
     const shifts: Shift[] = [];
@@ -27,6 +27,14 @@ export function generateSchedule() {
     // 1. Generate all shift slots
     allDays.forEach(day => {
         const dateStr = format(day, 'yyyy-MM-dd');
+
+        // Spring Break Exclusion: March 6 - March 15
+        const sbStart = new Date(2026, 2, 6); // March 6
+        const sbEnd = new Date(2026, 2, 15); // March 15
+        if (day >= sbStart && day <= sbEnd) {
+            return; // Skip this day
+        }
+
         const dayOfWeek = getDay(day); // 0=Sun, 1=Mon, ..., 6=Sat
 
         if (dayOfWeek === 5 || dayOfWeek === 6) {
@@ -40,7 +48,7 @@ export function generateSchedule() {
     });
 
     // 2. Fetch users and preferences
-    const users = db.prepare('SELECT id FROM users').all() as { id: number }[];
+    const users = db.prepare('SELECT id, handicap FROM users').all() as { id: number, handicap: number }[];
     const preferences = db.prepare('SELECT user_id, date, status FROM preferences').all() as { user_id: number, date: string, status: number }[];
 
     // Map preferences for quick lookup: userId -> date -> status
@@ -64,6 +72,21 @@ export function generateSchedule() {
         });
     });
 
+    // Load LOCKED shifts into stats
+    const lockedShifts = db.prepare('SELECT date, type, user_id FROM schedule WHERE locked = 1').all() as { date: string, type: ShiftType, user_id: number }[];
+    const lockedKeys = new Set<string>();
+
+    lockedShifts.forEach(ls => {
+        lockedKeys.add(`${ls.date}-${ls.type}`);
+        if (ls.user_id && userStats.has(ls.user_id)) {
+            const stats = userStats.get(ls.user_id)!;
+            stats.datesAssigned.add(ls.date);
+            if (ls.type === 'weekday') stats.weekdayCount++;
+            if (ls.type === 'weekend_pri') stats.weekendPriCount++;
+            if (ls.type === 'weekend_sec') stats.weekendSecCount++;
+        }
+    });
+
     // 4. Assignment Logic
     // We'll process Weekend Primary first (hardest), then Weekend Secondary, then Weekday.
     // Or maybe shuffle shifts to avoid bias?
@@ -78,12 +101,21 @@ export function generateSchedule() {
         return typeScore(a.type) - typeScore(b.type);
     });
 
-    // Clear existing schedule
-    db.prepare('DELETE FROM schedule').run();
+    // Clear existing schedule BUT keep locked ones
+    db.prepare('DELETE FROM schedule WHERE locked = 0').run();
+
+    // We need to be careful not to insert duplicates for locked shifts.
+    // The UNIQUE constraint will fail if we try to insert.
+    // So we should filter out shifts that are already locked.
 
     const insertStmt = db.prepare('INSERT INTO schedule (date, type, user_id) VALUES (?, ?, ?)');
 
     for (const shift of sortedShifts) {
+        // Skip if this slot is locked
+        if (lockedKeys.has(`${shift.date}-${shift.type}`)) {
+            continue;
+        }
+
         // Find candidates
         let candidates = users.filter(u => {
             const stats = userStats.get(u.id)!;
@@ -92,7 +124,7 @@ export function generateSchedule() {
 
             // Check preference
             const status = prefMap.get(u.id)?.get(shift.date) || 0;
-            if (status === 2) return false; // Cannot
+            if (status === 3) return false; // Excused (Hard Constraint)
 
             return true;
         });
@@ -109,13 +141,29 @@ export function generateSchedule() {
             let score = 0;
 
             // Balance counts
+            // Handicap: Positive handicap means they should take MORE shifts, so we LOWER their score.
+            // Negative handicap means LESS shifts, so we RAISE their score.
+            // We subtract the handicap from the count-based score.
+            // Since score is roughly count * 10, we can subtract handicap * 10.
+
+            const handicap = (u as any).handicap || 0;
+            const totalCount = stats.weekdayCount + stats.weekendPriCount + stats.weekendSecCount;
+
             if (shift.type === 'weekday') score += stats.weekdayCount * 10;
             if (shift.type === 'weekend_pri') score += stats.weekendPriCount * 10;
             if (shift.type === 'weekend_sec') score += stats.weekendSecCount * 10;
 
+            // Apply handicap to TOTAL score to bias overall assignment
+            // We use a smaller multiplier (e.g., 1 or 2) so it acts as a tie-breaker 
+            // and doesn't override the primary goal of balancing specific shift types.
+            // If handicap is 1, score reduces by 2.
+            // This means if two users have equal specific counts, the one with handicap will win.
+            score += (totalCount - handicap) * 2;
+
             // Preference penalty
             const status = prefMap.get(u.id)?.get(shift.date) || 0;
             if (status === 1) score += 100; // Prefer Not
+            if (status === 2) score += 500; // Strongly Prefer Not
 
             // Avoid back-to-back (yesterday or tomorrow)
             // Simple check: if assigned yesterday, add penalty
