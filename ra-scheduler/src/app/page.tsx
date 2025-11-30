@@ -21,23 +21,23 @@ export default async function Dashboard() {
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-[#00539B] text-white shadow-md">
+      <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold">{teamName}</h1>
+            <h1 className="text-xl font-semibold text-gray-900">{teamName}</h1>
             {user?.role === 'admin' && (
-              <span className="bg-blue-800 text-xs px-2 py-1 rounded">Admin</span>
+              <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded font-medium">Admin</span>
             )}
           </div>
-          <div className="flex items-center space-x-4">
-            <span>{user?.name} ({user?.netid})</span>
+          <div className="flex items-center space-x-6 text-sm">
+            <span className="text-gray-600">{user?.name} <span className="text-gray-400">({user?.netid})</span></span>
             {user?.role === 'admin' && (
-              <Link href="/admin" className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+              <Link href="/admin" className="text-gray-600 hover:text-gray-900 transition-colors">
                 Admin Panel
               </Link>
             )}
             <form action={logout}>
-              <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+              <button className="text-gray-500 hover:text-red-600 transition-colors">
                 Log Out
               </button>
             </form>

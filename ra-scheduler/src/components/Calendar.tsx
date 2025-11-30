@@ -64,10 +64,10 @@ export default function Calendar({ initialPreferences, events, onPreferenceChang
 
     const getStatusColor = (status: number) => {
         switch (status) {
-            case 1: return 'bg-yellow-200 hover:bg-yellow-300'; // Prefer Not
-            case 2: return 'bg-orange-300 hover:bg-orange-400'; // Strongly Prefer Not
-            case 3: return 'bg-red-400 hover:bg-red-500 text-white'; // Excused
-            default: return 'bg-white hover:bg-gray-50'; // Available
+            case 1: return 'bg-yellow-50 hover:bg-yellow-100 text-yellow-900'; // Prefer Not
+            case 2: return 'bg-orange-100 hover:bg-orange-200 text-orange-900'; // Strongly Prefer Not
+            case 3: return 'bg-red-50 hover:bg-red-100 text-red-900'; // Excused
+            default: return 'bg-white hover:bg-gray-50 text-gray-900'; // Available
         }
     };
 
@@ -81,13 +81,8 @@ export default function Calendar({ initialPreferences, events, onPreferenceChang
     }
 
     return (
-        <div className="space-y-8">
-            <div className="flex flex-wrap gap-4 mb-4 justify-center">
-                <div className="flex items-center gap-2"><div className="w-4 h-4 border bg-white"></div> Available</div>
-                <div className="flex items-center gap-2"><div className="w-4 h-4 border bg-yellow-200"></div> Prefer Not</div>
-                <div className="flex items-center gap-2"><div className="w-4 h-4 border bg-orange-300"></div> Strongly Prefer Not</div>
-                <div className="flex items-center gap-2"><div className="w-4 h-4 border bg-red-400"></div> Excused</div>
-            </div>
+        <div className="space-y-12">
+            {/* Legend removed as it is now in DashboardClient */}
 
             {months.map(monthStart => {
                 const daysInMonth = eachDayOfInterval({
@@ -99,15 +94,15 @@ export default function Calendar({ initialPreferences, events, onPreferenceChang
                 if (validDays.length === 0) return null;
 
                 return (
-                    <div key={monthStart.toISOString()} className="bg-white rounded-lg shadow p-4">
-                        <h3 className="text-lg font-semibold mb-4 text-center">{format(monthStart, 'MMMM yyyy')}</h3>
-                        <div className="grid grid-cols-7 gap-1 text-center text-sm">
+                    <div key={monthStart.toISOString()} className="mb-8">
+                        <h3 className="text-sm font-medium text-gray-500 mb-4 uppercase tracking-wider">{format(monthStart, 'MMMM yyyy')}</h3>
+                        <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-lg overflow-hidden">
                             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                <div key={day} className="font-medium text-gray-500 py-1">{day}</div>
+                                <div key={day} className="bg-gray-50 py-2 text-center text-xs font-medium text-gray-500">{day}</div>
                             ))}
 
                             {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => (
-                                <div key={`pad-${i}`} />
+                                <div key={`pad-${i}`} className="bg-white h-24" />
                             ))}
 
                             {daysInMonth.map(day => {
@@ -123,14 +118,14 @@ export default function Calendar({ initialPreferences, events, onPreferenceChang
                                 const eventName = eventMap.get(dateStr);
 
                                 if (isOutOfRange) {
-                                    return <div key={dateStr} className="p-2 text-gray-300">{format(day, 'd')}</div>;
+                                    return <div key={dateStr} className="bg-gray-50 h-24 p-2 text-gray-300 text-sm">{format(day, 'd')}</div>;
                                 }
 
                                 if (isSpringBreak) {
                                     return (
-                                        <div key={dateStr} className="p-1 border rounded bg-gray-100 text-gray-400 h-20 flex flex-col items-center justify-center">
-                                            <span className="font-medium">{format(day, 'd')}</span>
-                                            <span className="text-[10px] text-center">Spring Break</span>
+                                        <div key={dateStr} className="bg-gray-50 h-24 p-2 flex flex-col items-center justify-center text-gray-400">
+                                            <span className="text-sm font-medium">{format(day, 'd')}</span>
+                                            <span className="text-[10px] mt-1">Spring Break</span>
                                         </div>
                                     );
                                 }
@@ -154,74 +149,36 @@ export default function Calendar({ initialPreferences, events, onPreferenceChang
                                 return (
                                     <div
                                         key={dateStr}
-                                        className="border rounded relative h-24 overflow-hidden group"
+                                        className="relative h-24 group bg-white hover:z-10"
                                     >
-                                        {/* Default View (Visible when NOT hovering) */}
+                                        {/* Default View */}
                                         <div className={clsx(
-                                            "absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-200 group-hover:opacity-0",
+                                            "absolute inset-0 flex flex-col items-start justify-between p-2 transition-colors duration-200",
                                             getStatusColor(status)
                                         )}>
-                                            <span className="font-medium text-gray-800">{format(day, 'd')}</span>
-                                            {eventName && (
-                                                <span className="text-[10px] bg-blue-100 text-blue-800 px-1 rounded mt-1 w-full truncate text-center opacity-90">
-                                                    {eventName}
-                                                </span>
-                                            )}
-                                            <span className="text-xs font-medium mt-1">{getStatusText(status)}</span>
+                                            <span className="text-sm font-medium">{format(day, 'd')}</span>
+                                            <div className="w-full">
+                                                {eventName && (
+                                                    <div className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded mb-1 w-full truncate">
+                                                        {eventName}
+                                                    </div>
+                                                )}
+                                                {status !== 0 && (
+                                                    <div className="text-[10px] font-medium opacity-75">{getStatusText(status)}</div>
+                                                )}
+                                            </div>
                                         </div>
 
-                                        {/* Hover View (Visible when hovering) */}
-                                        <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-                                            {/* Top-Left: Available (0) */}
-                                            <button
-                                                onClick={() => handleQuadClick(0)}
-                                                className={clsx(
-                                                    "w-full h-full flex items-center justify-center text-[10px] font-bold leading-tight p-1 transition-colors",
-                                                    status === 0 ? "bg-white text-black" : "bg-gray-50 text-gray-500 hover:bg-white hover:text-black"
-                                                )}
-                                            >
-                                                Available
-                                            </button>
-                                            {/* Top-Right: Prefer Not (1) */}
-                                            <button
-                                                onClick={() => handleQuadClick(1)}
-                                                className={clsx(
-                                                    "w-full h-full flex items-center justify-center text-[10px] font-bold leading-tight p-1 transition-colors",
-                                                    status === 1 ? "bg-yellow-200 text-yellow-900" : "bg-yellow-50 text-yellow-700 hover:bg-yellow-200 hover:text-yellow-900"
-                                                )}
-                                            >
-                                                Prefer Not
-                                            </button>
-                                            {/* Bottom-Left: Strongly Prefer Not (2) */}
-                                            <button
-                                                onClick={() => handleQuadClick(2)}
-                                                className={clsx(
-                                                    "w-full h-full flex items-center justify-center text-[10px] font-bold leading-tight p-1 transition-colors",
-                                                    status === 2 ? "bg-orange-300 text-orange-900" : "bg-orange-50 text-orange-700 hover:bg-orange-300 hover:text-orange-900"
-                                                )}
-                                            >
-                                                Strongly No
-                                            </button>
-                                            {/* Bottom-Right: Excused (3) */}
-                                            <button
-                                                onClick={() => handleQuadClick(3)}
-                                                className={clsx(
-                                                    "w-full h-full flex items-center justify-center text-[10px] font-bold leading-tight p-1 transition-colors",
-                                                    status === 3 ? "bg-red-400 text-white" : "bg-red-50 text-red-700 hover:bg-red-400 hover:text-white"
-                                                )}
-                                            >
-                                                Excused
-                                            </button>
-                                        </div>
-
-                                        {/* Date Overlay for Hover State (Optional, maybe just let the buttons speak?) 
-                                            Actually, if we cover everything, we lose the date context. 
-                                            Let's put a small date badge in the center or corner that stays on top?
-                                            Or maybe just rely on the user knowing which box they hovered.
-                                            Let's add a small absolute centered date that is pointer-events-none.
-                                        */}
-                                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-0 group-hover:opacity-20 z-20">
-                                            <span className="text-4xl font-bold text-black">{format(day, 'd')}</span>
+                                        {/* Hover Actions - Simplified */}
+                                        <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col z-20 shadow-sm">
+                                            <div className="flex-1 flex">
+                                                <button onClick={() => handleQuadClick(0)} className="flex-1 hover:bg-gray-50 text-[10px] text-gray-900 font-medium border-b border-r border-gray-100">Avail</button>
+                                                <button onClick={() => handleQuadClick(1)} className="flex-1 hover:bg-yellow-50 text-[10px] text-yellow-900 font-medium border-b border-gray-100">Prefer Not</button>
+                                            </div>
+                                            <div className="flex-1 flex">
+                                                <button onClick={() => handleQuadClick(2)} className="flex-1 hover:bg-orange-50 text-[10px] text-orange-900 font-medium border-r border-gray-100">Strongly No</button>
+                                                <button onClick={() => handleQuadClick(3)} className="flex-1 hover:bg-red-50 text-[10px] text-red-900 font-medium">Excused</button>
+                                            </div>
                                         </div>
                                     </div>
                                 );

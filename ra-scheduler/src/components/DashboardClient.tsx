@@ -77,84 +77,84 @@ export default function DashboardClient({ initialPreferences, events, stats, use
     return (
         <div>
             {/* Stats Banner */}
-            <div className="bg-white p-4 rounded-lg shadow mb-8 flex justify-around text-center">
-                <div>
-                    <div className="text-2xl font-bold text-blue-600">{stats.userCount}</div>
-                    <div className="text-sm text-gray-500">Total RAs</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="bg-white p-4 rounded-lg border border-gray-200 flex flex-col items-center justify-center">
+                    <span className="text-3xl font-light text-gray-900">{stats.userCount}</span>
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider mt-1">Total RAs</span>
                 </div>
-                <div>
-                    <div className={clsx("text-2xl font-bold", availWeekday >= stats.weekdayTarget ? "text-green-600" : "text-red-600")}>
-                        {availWeekday} / {stats.weekdayTarget}
+                <div className="bg-white p-4 rounded-lg border border-gray-200 flex flex-col items-center justify-center">
+                    <div className="flex items-baseline gap-1">
+                        <span className={clsx("text-3xl font-light", availWeekday >= stats.weekdayTarget ? "text-gray-900" : "text-red-700")}>
+                            {availWeekday}
+                        </span>
+                        <span className="text-sm text-gray-500 font-light">of {stats.weekdayTarget} target</span>
                     </div>
-                    <div className="text-sm text-gray-500">Available Weekday (Target)</div>
+                    <span className="text-xs font-medium text-gray-600 uppercase tracking-wider mt-1">Weekday Availability</span>
                 </div>
-                <div>
-                    <div className={clsx("text-2xl font-bold", availWeekend >= stats.weekendTarget ? "text-green-600" : "text-red-600")}>
-                        {availWeekend} / {stats.weekendTarget}
+                <div className="bg-white p-4 rounded-lg border border-gray-200 flex flex-col items-center justify-center">
+                    <div className="flex items-baseline gap-1">
+                        <span className={clsx("text-3xl font-light", availWeekend >= stats.weekendTarget ? "text-gray-900" : "text-red-700")}>
+                            {availWeekend}
+                        </span>
+                        <span className="text-sm text-gray-500 font-light">of {stats.weekendTarget} target</span>
                     </div>
-                    <div className="text-sm text-gray-500">Available Weekend (Target)</div>
+                    <span className="text-xs font-medium text-gray-600 uppercase tracking-wider mt-1">Weekend Availability</span>
                 </div>
             </div>
 
-            <div className="flex justify-between items-center bg-blue-50 border-l-4 border-blue-500 p-4 mb-8">
-                <p className="text-sm text-blue-700">
-                    <strong>Instructions:</strong> Hover over dates to select your preference:
-                    <span className="inline-block w-3 h-3 bg-white border ml-2 mr-1"></span>Available
-                    <span className="inline-block w-3 h-3 bg-yellow-200 ml-2 mr-1"></span>Prefer Not
-                    <span className="inline-block w-3 h-3 bg-orange-300 ml-2 mr-1"></span>Strongly Prefer Not
-                    <span className="inline-block w-3 h-3 bg-red-400 ml-2 mr-1"></span>Excused
-                </p>
-                <button
-                    onClick={handleReset}
-                    className="text-xs text-red-600 hover:text-red-800 border border-red-200 hover:border-red-400 bg-white px-3 py-1 rounded transition-colors"
-                >
-                    Reset All Preferences
-                </button>
-            </div>
+            {/* Actions Bar */}
+            <div className="flex flex-col md:flex-row justify-between items-center bg-white border border-gray-200 p-4 rounded-lg mb-8 gap-4">
+                <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <span className="font-medium text-gray-900">Legend:</span>
+                    <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-white border border-gray-300"></span> Available</div>
+                    <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-yellow-100 border border-yellow-200"></span> Prefer Not</div>
+                    <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-100 border border-orange-200"></span> Strongly No</div>
+                    <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-100 border border-red-200"></span> Excused</div>
+                </div>
 
-            {/* Bulk Preferences */}
-            <div className="bg-white p-4 rounded-lg shadow mb-8">
-                <h3 className="text-lg font-semibold mb-4 text-gray-800">Bulk Preferences</h3>
-                <div className="flex flex-wrap items-end gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Day of Week</label>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                         <select
                             id="bulk-day"
-                            className="block w-40 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                            className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-md focus:ring-gray-500 focus:border-gray-500 block p-2"
                         >
-                            <option value="1">Monday</option>
-                            <option value="2">Tuesday</option>
-                            <option value="3">Wednesday</option>
-                            <option value="4">Thursday</option>
-                            <option value="5">Friday</option>
-                            <option value="6">Saturday</option>
-                            <option value="0">Sunday</option>
+                            <option value="1">Mondays</option>
+                            <option value="2">Tuesdays</option>
+                            <option value="3">Wednesdays</option>
+                            <option value="4">Thursdays</option>
+                            <option value="5">Fridays</option>
+                            <option value="6">Saturdays</option>
+                            <option value="0">Sundays</option>
                         </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Preference</label>
                         <select
                             id="bulk-status"
-                            className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                            className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-md focus:ring-gray-500 focus:border-gray-500 block p-2"
                         >
                             <option value="0">Available</option>
                             <option value="1">Prefer Not</option>
-                            <option value="2">Strongly Prefer Not</option>
+                            <option value="2">Strongly No</option>
                         </select>
-                    </div>
-                    <button
-                        onClick={async () => {
-                            const day = parseInt((document.getElementById('bulk-day') as HTMLSelectElement).value);
-                            const status = parseInt((document.getElementById('bulk-status') as HTMLSelectElement).value);
+                        <button
+                            onClick={async () => {
+                                const day = parseInt((document.getElementById('bulk-day') as HTMLSelectElement).value);
+                                const status = parseInt((document.getElementById('bulk-status') as HTMLSelectElement).value);
 
-                            if (confirm(`Are you sure you want to set this preference for ALL selected days in the semester?`)) {
-                                await import('@/app/actions').then(mod => mod.bulkApplyPreference(day, status));
-                                window.location.reload(); // Reload to reflect changes
-                            }
-                        }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
+                                if (confirm(`Apply this preference to all selected days?`)) {
+                                    await import('@/app/actions').then(mod => mod.bulkApplyPreference(day, status));
+                                    window.location.reload();
+                                }
+                            }}
+                            className="text-gray-600 hover:text-gray-900 font-medium text-sm px-3 py-2 rounded hover:bg-gray-100 transition-colors"
+                        >
+                            Apply
+                        </button>
+                    </div>
+                    <div className="h-6 w-px bg-gray-200 mx-2"></div>
+                    <button
+                        onClick={handleReset}
+                        className="text-red-500 hover:text-red-700 font-medium text-sm px-3 py-2 rounded hover:bg-red-50 transition-colors"
                     >
-                        Apply to All
+                        Reset All
                     </button>
                 </div>
             </div>
