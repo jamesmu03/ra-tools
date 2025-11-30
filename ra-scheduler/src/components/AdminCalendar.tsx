@@ -64,7 +64,10 @@ export default function AdminCalendar({ schedule, users, onAssign }: { schedule:
         // Weekday: 'weekday'
         // Weekend: 'weekend_pri', 'weekend_sec'
 
-        const dayOfWeek = new Date(date).getDay();
+        // Fix: Parse date explicitly to avoid UTC/Local timezone issues with "YYYY-MM-DD" string
+        const [y, m, d] = date.split('-').map(Number);
+        const dayObj = new Date(y, m - 1, d);
+        const dayOfWeek = dayObj.getDay();
         const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Fri, Sat
 
         const existingShifts = scheduleMap.get(date) || [];
@@ -121,12 +124,21 @@ export default function AdminCalendar({ schedule, users, onAssign }: { schedule:
     useEffect(() => {
         if (editingShifts) {
             document.body.style.overflow = 'hidden';
+
+            const handleKeyDown = (e: KeyboardEvent) => {
+                if (e.key === 'Escape') {
+                    setEditingShifts(null);
+                }
+            };
+            window.addEventListener('keydown', handleKeyDown);
+
+            return () => {
+                document.body.style.overflow = 'unset';
+                window.removeEventListener('keydown', handleKeyDown);
+            };
         } else {
             document.body.style.overflow = 'unset';
         }
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
     }, [editingShifts]);
 
     return (
