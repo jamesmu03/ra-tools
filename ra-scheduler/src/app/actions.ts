@@ -153,3 +153,64 @@ export async function getCurrentUser() {
     if (!netid) return null;
     return db.prepare('SELECT * FROM users WHERE netid = ?').get(netid) as any;
 }
+
+export async function getTeamName() {
+    const cookieStore = await cookies();
+    const netid = cookieStore.get('netid')?.value;
+    if (!netid) return 'RA Scheduler';
+
+    const user = db.prepare('SELECT role, team_name FROM users WHERE netid = ?').get(netid) as any;
+    if (!user) return 'RA Scheduler';
+
+    if (user.team_name) return user.team_name;
+
+    // If user has no team_name, try to find an admin's team name
+    const admin = db.prepare("SELECT team_name FROM users WHERE role = 'admin' AND team_name IS NOT NULL LIMIT 1").get() as any;
+    return admin?.team_name || 'RA Scheduler';
+}
+
+export async function bulkApplyPreference(dayOfWeek: number, status: number) {
+    const cookieStore = await cookies();
+    const netid = cookieStore.get('netid')?.value;
+
+    if (!netid) throw new Error('Not authenticated');
+
+    const user = db.prepare('SELECT id FROM users WHERE netid = ?').get(netid) as any;
+    if (!user) throw new Error('User not found');
+
+    const startDate = new Date(2026, 0, 3); // Jan 3, 2026
+    const endDate = new Date(2026, 4, 10); // May 10, 2026
+    const sbStart = new Date(2026, 2, 6);
+    const sbEnd = new Date(2026, 2, 15);
+
+    const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+
+    const daysToUpdate: string[] = [];
+
+    allDays.forEach(day => {
+        if (day >= sbStart && day <= sbEnd) return;
+        if (getDay(day) === dayOfWeek) {
+            daysToUpdate.push(day.toISOString().split('T')[0]);
+        }
+    });
+
+    const insertStmt = db.prepare(`
+        INSERT INTO preferences (user_id, date, status) 
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id, date) DO UPDATE SET status = excluded.status
+    `);
+
+    const deleteStmt = db.prepare('DELETE FROM preferences WHERE user_id = ? AND date = ?');
+
+    const transaction = db.transaction((days: string[]) => {
+        for (const date of days) {
+            if (status === 0) {
+                deleteStmt.run(user.id, date);
+            } else {
+                insertStmt.run(user.id, date, status);
+            }
+        }
+    });
+
+    transaction(daysToUpdate);
+}

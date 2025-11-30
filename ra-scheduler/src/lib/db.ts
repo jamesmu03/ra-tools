@@ -13,7 +13,9 @@ db.exec(`
     name TEXT NOT NULL,
     email TEXT, -- Added for Phase 2
     handicap INTEGER DEFAULT 0, -- Added for Phase 4
-    role TEXT DEFAULT 'user' -- 'admin' or 'user'
+    role TEXT DEFAULT 'user', -- 'admin' or 'user'
+    team_name TEXT, -- Added for Phase 21
+    onboarding_completed INTEGER DEFAULT 0 -- Added for Phase 23
   );
 
   CREATE TABLE IF NOT EXISTS preferences (

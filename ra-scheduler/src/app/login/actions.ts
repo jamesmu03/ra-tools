@@ -18,6 +18,7 @@ export async function login(formData: FormData) {
     if (!user) {
         const userCount = db.prepare('SELECT count(*) as count FROM users').get() as { count: number };
         const role = userCount.count === 0 ? 'admin' : 'user';
+
         db.prepare('INSERT INTO users (netid, name, role) VALUES (?, ?, ?)').run(netid, name, role);
     } else {
         // Update name if changed

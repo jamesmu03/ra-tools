@@ -1,3 +1,5 @@
+'use client';
+
 import { login } from './actions';
 
 export default function LoginPage() {

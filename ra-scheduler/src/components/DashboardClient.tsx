@@ -112,6 +112,53 @@ export default function DashboardClient({ initialPreferences, events, stats, use
                 </button>
             </div>
 
+            {/* Bulk Preferences */}
+            <div className="bg-white p-4 rounded-lg shadow mb-8">
+                <h3 className="text-lg font-semibold mb-4 text-gray-800">Bulk Preferences</h3>
+                <div className="flex flex-wrap items-end gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Day of Week</label>
+                        <select
+                            id="bulk-day"
+                            className="block w-40 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        >
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="0">Sunday</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Preference</label>
+                        <select
+                            id="bulk-status"
+                            className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        >
+                            <option value="0">Available</option>
+                            <option value="1">Prefer Not</option>
+                            <option value="2">Strongly Prefer Not</option>
+                        </select>
+                    </div>
+                    <button
+                        onClick={async () => {
+                            const day = parseInt((document.getElementById('bulk-day') as HTMLSelectElement).value);
+                            const status = parseInt((document.getElementById('bulk-status') as HTMLSelectElement).value);
+
+                            if (confirm(`Are you sure you want to set this preference for ALL selected days in the semester?`)) {
+                                await import('@/app/actions').then(mod => mod.bulkApplyPreference(day, status));
+                                window.location.reload(); // Reload to reflect changes
+                            }
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
+                    >
+                        Apply to All
+                    </button>
+                </div>
+            </div>
+
             <Calendar
                 initialPreferences={preferences}
                 events={events}

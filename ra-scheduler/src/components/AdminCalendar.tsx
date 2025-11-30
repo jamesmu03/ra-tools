@@ -82,7 +82,7 @@ export default function AdminCalendar({ schedule, users, onAssign }: { schedule:
         // Map user_id to userId if present in existing shifts
         const mappedShifts = shiftsToEdit.map(s => ({
             ...s,
-            userId: (s as any).user_id !== undefined ? (s as any).user_id : s.userId
+            userId: (s as any).user_id !== undefined ? (s as any).user_id : (s as any).userId
         }));
 
         setEditingShifts(mappedShifts);
