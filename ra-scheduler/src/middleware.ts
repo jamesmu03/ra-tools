@@ -27,9 +27,10 @@ export function middleware(request: NextRequest) {
     const isProduction = process.env.NODE_ENV === 'production';
 
     // Production Security: Block Mock Login
-    if (isProduction && !shibUser && !netid) {
-        return new NextResponse('Access Denied: Shibboleth Authentication Required. Please ensure this application is protected by Shibboleth.', { status: 403 });
-    }
+    // Production Security: Block Mock Login - DISABLED for Vercel deployment (no Shibboleth SP)
+    // if (isProduction && !shibUser && !netid) {
+    //     return new NextResponse('Access Denied: Shibboleth Authentication Required. Please ensure this application is protected by Shibboleth.', { status: 403 });
+    // }
 
     if (!netid && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/api/shibboleth')) {
         return NextResponse.redirect(new URL('/login', request.url));
@@ -39,10 +40,10 @@ export function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // Block direct access to /login in production even if not logged in (handled above, but for clarity)
-    if (isProduction && request.nextUrl.pathname.startsWith('/login')) {
-        return new NextResponse('Mock Login Disabled in Production', { status: 403 });
-    }
+    // Block direct access to /login in production - DISABLED for Vercel
+    // if (isProduction && request.nextUrl.pathname.startsWith('/login')) {
+    //     return new NextResponse('Mock Login Disabled in Production', { status: 403 });
+    // }
 
     if (netid && request.nextUrl.pathname.startsWith('/login')) {
         return NextResponse.redirect(new URL('/', request.url));
