@@ -30,6 +30,7 @@ export async function initSchema() {
     `;
 
     // Schedule Table
+    // Schedule Table
     await sql`
       CREATE TABLE IF NOT EXISTS schedule (
         id SERIAL PRIMARY KEY,
@@ -37,53 +38,28 @@ export async function initSchema() {
         type TEXT NOT NULL,
         user_id INTEGER REFERENCES users(id),
         locked INTEGER DEFAULT 0,
-        UNIQUE(date, type, user_id) -- Modified unique constraint to allow multiple teams potentially, but for now keeping simple
-      );
-    `;
-    // Note: The original UNIQUE(date, type) assumes only one schedule per day. 
-    // For multi-tenancy, we need to filter by user's team, so the constraint should probably include team or we just rely on app logic.
-    // Actually, if we want multiple quads, 'date' and 'type' are not unique globally anymore.
-    // They are unique PER QUAD.
-    // Since we don't have a 'quads' table yet, we rely on 'user_id' to infer quad.
-    // But 'schedule' entries might not have a user_id if we have open slots? 
-    // The current logic inserts assigned slots.
-    // If we want to enforce uniqueness per quad, we need a way to know the quad of the schedule slot.
-    // We should add 'team_name' to the schedule table to make it explicit and queryable without joining.
-
-    // Let's add team_name to schedule and events for easier multi-tenancy.
-
-    // We need to alter the table if it exists, or just create it with the new column.
-    // Since we are migrating to a fresh DB, we can define it correctly now.
-
-    await sql`
-      CREATE TABLE IF NOT EXISTS schedule (
-        id SERIAL PRIMARY KEY,
-        date TEXT NOT NULL,
-        type TEXT NOT NULL,
-        user_id INTEGER REFERENCES users(id),
-        locked INTEGER DEFAULT 0,
-        team_name TEXT NOT NULL -- Added for multi-tenancy
+        team_name TEXT NOT NULL
       );
     `;
     // We should probably remove the unique constraint or make it (date, type, team_name).
     // Let's make it (date, type, team_name).
     await sql`
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_unique ON schedule (date, type, team_name);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_unique ON schedule(date, type, team_name);
     `;
 
 
     // Events Table
     await sql`
-      CREATE TABLE IF NOT EXISTS events (
-        id SERIAL PRIMARY KEY,
-        date TEXT NOT NULL,
-        name TEXT NOT NULL,
-        team_name TEXT NOT NULL -- Added for multi-tenancy
+      CREATE TABLE IF NOT EXISTS events(
+      id SERIAL PRIMARY KEY,
+      date TEXT NOT NULL,
+      name TEXT NOT NULL,
+      team_name TEXT NOT NULL-- Added for multi - tenancy
       );
     `;
     // Unique date per team
     await sql`
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_events_unique ON events (date, team_name);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_events_unique ON events(date, team_name);
     `;
 
     console.log('Schema initialized successfully');
