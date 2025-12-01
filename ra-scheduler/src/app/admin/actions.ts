@@ -1,14 +1,15 @@
 'use server'
 
-import { cookies } from 'next/headers';
+import { auth } from '@/auth';
 import sql from '@/lib/db';
 import { generateSchedule as libGenerateSchedule } from '@/lib/scheduler';
 import { redirect } from 'next/navigation';
 import { getTeamName } from '../actions';
 
 async function checkAdmin() {
-    const cookieStore = await cookies();
-    const netid = cookieStore.get('netid')?.value;
+    const session = await auth();
+    // @ts-ignore
+    const netid = session?.user?.netid;
     if (!netid) redirect('/login');
 
     const userResult = await sql`SELECT role FROM users WHERE netid = ${netid}`;

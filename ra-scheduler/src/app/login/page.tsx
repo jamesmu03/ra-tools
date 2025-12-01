@@ -1,50 +1,37 @@
-'use client';
-
-import { login } from './actions';
+import { signIn } from "@/auth"
+import { Calendar } from 'lucide-react';
 
 export default function LoginPage() {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100">
-            <div className="max-w-md w-full bg-white p-8 shadow-md rounded-lg">
-                <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-[#00539B]">Duke Log In</h1>
-                    <p className="text-gray-600">NetID Authentication (Mock)</p>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-xl shadow-lg">
+                <div className="text-center">
+                    <div className="mx-auto h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center">
+                        <Calendar className="h-8 w-8 text-white" />
+                    </div>
+                    <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+                        RA Scheduler
+                    </h2>
+                    <p className="mt-2 text-sm text-gray-600">
+                        Sign in with your Duke NetID (via Google)
+                    </p>
                 </div>
 
-                <form action={login} className="space-y-6">
-                    <div>
-                        <label htmlFor="netid" className="block text-sm font-medium text-gray-700">
-                            NetID
-                        </label>
-                        <input
-                            type="text"
-                            name="netid"
-                            id="netid"
-                            required
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#00539B] focus:border-[#00539B]"
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                            Full Name
-                        </label>
-                        <input
-                            type="text"
-                            name="name"
-                            id="name"
-                            required
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#00539B] focus:border-[#00539B]"
-                        />
-                    </div>
-
-                    <button
-                        type="submit"
-                        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#00539B] hover:bg-[#003366] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00539B]"
+                <div className="mt-8 space-y-6">
+                    <form
+                        action={async () => {
+                            "use server"
+                            await signIn("google")
+                        }}
                     >
-                        Log In
-                    </button>
-                </form>
+                        <button
+                            type="submit"
+                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                        >
+                            Sign in with Google
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     );

@@ -1,6 +1,6 @@
 'use server'
 
-import { cookies } from 'next/headers';
+import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import sql from '@/lib/db';
 
@@ -8,8 +8,9 @@ export async function completeOnboarding(formData: FormData) {
     const isRc = formData.get('is_rc') === 'on';
     const teamName = formData.get('team_name') as string;
 
-    const cookieStore = await cookies();
-    const netid = cookieStore.get('netid')?.value;
+    const session = await auth();
+    // @ts-ignore
+    const netid = session?.user?.netid;
 
     if (!netid) {
         redirect('/login');

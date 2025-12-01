@@ -1,12 +1,17 @@
 'use server'
 
-import { cookies } from 'next/headers';
+import { auth } from '@/auth';
 import sql from '@/lib/db';
 import { eachDayOfInterval, getDay } from 'date-fns';
 
+async function getNetId() {
+    const session = await auth();
+    // @ts-ignore
+    return session?.user?.netid;
+}
+
 export async function getPreferences() {
-    const cookieStore = await cookies();
-    const netid = cookieStore.get('netid')?.value;
+    const netid = await getNetId();
 
     if (!netid) return {};
 
@@ -34,8 +39,7 @@ export async function getEvents() {
 }
 
 export async function savePreference(date: string, status: number) {
-    const cookieStore = await cookies();
-    const netid = cookieStore.get('netid')?.value;
+    const netid = await getNetId();
 
     if (!netid) throw new Error('Not authenticated');
 
@@ -57,8 +61,7 @@ export async function savePreference(date: string, status: number) {
 }
 
 export async function resetPreferences() {
-    const cookieStore = await cookies();
-    const netid = cookieStore.get('netid')?.value;
+    const netid = await getNetId();
 
     if (!netid) throw new Error('Not authenticated');
 
@@ -157,16 +160,14 @@ export async function getShiftStats() {
 }
 
 export async function getCurrentUser() {
-    const cookieStore = await cookies();
-    const netid = cookieStore.get('netid')?.value;
+    const netid = await getNetId();
     if (!netid) return null;
     const result = await sql`SELECT * FROM users WHERE netid = ${netid}`;
     return result.rows[0];
 }
 
 export async function getTeamName() {
-    const cookieStore = await cookies();
-    const netid = cookieStore.get('netid')?.value;
+    const netid = await getNetId();
     if (!netid) return 'RA Scheduler';
 
     const userResult = await sql`SELECT role, team_name FROM users WHERE netid = ${netid}`;
@@ -183,8 +184,7 @@ export async function getTeamName() {
 }
 
 export async function bulkApplyPreference(dayOfWeek: number, status: number) {
-    const cookieStore = await cookies();
-    const netid = cookieStore.get('netid')?.value;
+    const netid = await getNetId();
 
     if (!netid) throw new Error('Not authenticated');
 
